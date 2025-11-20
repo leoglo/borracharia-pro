@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Borracharia do Amor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    .animate-spin-slow { animation: spin 1s linear infinite; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-purple-900 via-pink-800 to-red-900 text-white">
+<script src="/js/app.js"></script>
+
+  <div class="container mx-auto p-6 max-w-6xl" x-data="app()">
+
+    <!-- HEADER -->
+    <header class="text-center mb-10">
+      <h1 class="text-5xl md:text-6xl font-bold animate-pulse">
+        Borracharia do Amor
+      </h1>
+      <p class="text-xl mt-2 opacity-80">Pneus com paixão</p>
+    </header>
+
+    <!-- BOTÃO ADICIONAR -->
+    <div class="flex justify-end mb-6">
+      <button @click="openModal()" class="bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-6 rounded-full shadow-lg transition transform hover:scale-105">
+        + Novo Produto
+      </button>
+    </div>
+
+    <!-- LOADING -->
+    <template x-if="loading">
+      <div class="text-center py-20">
+        <div class="inline-block animate-spin-slow rounded-full h-16 w-16 border-8 border-white border-t-transparent"></div>
+        <p class="mt-4 text-xl">Carregando pneus...</p>
+      </div>
+    </template>
+
+    <!-- LISTA DE PRODUTOS -->
+    <template x-if="!loading">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <template x-for="produto in produtos" :key="produto.id">
+          <div class="bg-white/10 backdrop-blur-md rounded-xl p-6 shadow-xl hover:scale-105 transition transform">
+            <h3 class="text-2xl font-bold" x-text="produto.marca"></h3>
+            <p class="text-sm opacity-80" x-text="produto.descricao"></p>
+            <p class="text-3xl font-bold mt-3 text-pink-300">R$ <span x-text="formatarPreco(produto.precoVenda)"></span></p>
+            <p class="text-sm mt-1">Estoque: <span class="font-bold" x-text="produto.quantidadeEstoque"></span></p>
+
+            <div class="flex gap-2 mt-4">
+              <button @click="editar(produto)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-semibold transition">
+                Editar
+              </button>
+              <button @click="excluir(produto.id)" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-sm font-semibold transition">
+                Excluir
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- MODAL -->
+    <div x-show="modalAberto" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" x-transition>
+      <div @click.away="fecharModal()" class="bg-white text-gray-900 rounded-2xl p-8 w-full max-w-lg shadow-2xl">
+        <h2 class="text-2xl font-bold mb-6" x-text="editando ? 'Editar Produto' : 'Novo Produto'"></h2>
+
+        <form @submit.prevent="salvar()">
+          <div class="space-y-4">
+            <input type="text" x-model="form.codigoProduto" placeholder="Código *" class="w-full p-3 border rounded-lg" required />
+            <input type="text" x-model="form.descricao" placeholder="Descrição *" class="w-full p-3 border rounded-lg" required />
+            <input type="text" x-model="form.marca" placeholder="Marca" class="w-full p-3 border rounded-lg" />
+            <input type="number" step="0.01" x-model.number="form.precoVenda" placeholder="Preço de Venda" class="w-full p-3 border rounded-lg" />
+            <input type="number" x-model.number="form.quantidadeEstoque" placeholder="Estoque" class="w-full p-3 border rounded-lg" />
+          </div>
+
+          <div class="flex gap-3 mt-6">
+            <button type="submit" class="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-bold py-3 rounded-lg transition">
+              <span x-text="editando ? 'Atualizar' : 'Criar'"></span>
+            </button>
+            <button type="button" @click="fecharModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 rounded-lg transition">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function app() {
+      return {
+        produtos: [],
+        loading: true,
+        modalAberto: false,
+        editando: false,
+        form: {
+          id: null,
+          codigoProduto: '',
+          descricao: '',
+          marca: '',
+          precoVenda: 0,
+          quantidadeEstoque: 0
+        },
+
+        init() {
+          this.carregarProdutos();
+        },
+
+        carregarProdutos() {
+          fetch('/produtos')
+            .then(r => r.json())
+            .then(data => {
+              this.produtos = data;
+              this.loading = false;
+            });
+        },
+
+        openModal() {
+          this.modalAberto = true;
+          this.editando = false;
+          this.limparForm();
+        },
+
+        editar(produto) {
+          this.form = { ...produto };
+          this.editando = true;
+          this.modalAberto = true;
+        },
+
+        salvar() {
+          const url = this.editando ? `/produtos/${this.form.id}` : '/produtos';
+          const method = this.editando ? 'PUT' : 'POST';
+
+          fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.form)
+          })
+          .then(r => {
+            if (r.ok) {
+              this.fecharModal();
+              this.carregarProdutos();
+            } else {
+              alert('Erro ao salvar!');
+            }
+          });
+        },
+
+        excluir(id) {
+          if (confirm('Tem certeza que quer excluir?')) {
+            fetch(`/produtos/${id}`, { method: 'DELETE' })
+              .then(() => this.carregarProdutos());
+          }
+        },
+
+        fecharModal() {
+          this.modalAberto = false;
+          this.limparForm();
+        },
+
+        limparForm() {
+          this.form = { id: null, codigoProduto: '', descricao: '', marca: '', precoVenda: 0, quantidadeEstoque: 0 };
+        },
+
+        formatarPreco(valor) {
+          return Number(valor).toFixed(2).replace('.', ',');
+        }
+      };
+    }
+  </script>
+</body>
+</html>
