@@ -1,8 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import DashboardPage from './pages/DashboardPage.jsx';
+
 import ProductsPage from './pages/ProductsPage.jsx';
 import ProductFormPage from './pages/ProductFormPage.jsx';
+
+import ClientsPage from './pages/ClientsPage.jsx';
+import ClientFormPage from './pages/ClientFormPage.jsx';
 
 export default function App() {
   return (
@@ -15,6 +19,10 @@ export default function App() {
             <Route path="/produtos" element={<ProductsPage />} />
             <Route path="/produtos/novo" element={<ProductFormPage />} />
             <Route path="/produtos/editar/:id" element={<ProductFormPage />} />
+            <Route path="/clientes" element={<ClientsPage />} />
+            <Route path="/clientes/novo" element={<ClientFormPage />} />
+            <Route path="/clientes/editar/:id" element={<ClientFormPage />} />
+
           </Routes>
         </main>
       </div>

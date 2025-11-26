@@ -21,21 +21,19 @@ public class ClienteService {
 
     @Transactional
     public ClienteResponseDTO salvar(ClienteRequestDTO dto) {
-        // normaliza valores
         String cpfLimpo = limpar(dto.getCpf());
         String telefoneLimpo = limpar(dto.getTelefone());
+        String cepLimpo = limpar(dto.getCep());
 
-        // valida nome obrigatório
         if (dto.getNome() == null || dto.getNome().isBlank()) {
             throw new RuntimeException("Nome é obrigatório!");
         }
 
-        // valida CPF (se informado)
         if (cpfLimpo != null && !cpfLimpo.isBlank()) {
             if (!isCpfValido(cpfLimpo)) {
                 throw new RuntimeException("CPF inválido!");
             }
-            if (repository.findByCpf(cpfLimpo).isPresent()) {
+            if (repository.existsByCpf(cpfLimpo)) {
                 throw new RuntimeException("CPF já cadastrado!");
             }
         }
@@ -44,6 +42,12 @@ public class ClienteService {
         cliente.setNome(dto.getNome().trim());
         cliente.setCpf(cpfLimpo);
         cliente.setTelefone(telefoneLimpo);
+        cliente.setCep(cepLimpo);
+        cliente.setRua(dto.getRua() != null ? dto.getRua().trim() : null);
+        cliente.setNumero(dto.getNumero());
+        cliente.setBairro(dto.getBairro() != null ? dto.getBairro().trim() : null);
+        cliente.setCidade(dto.getCidade() != null ? dto.getCidade().trim() : null);
+        cliente.setEstado(dto.getEstado() != null ? dto.getEstado().trim() : null);
 
         Cliente salvo = repository.save(cliente);
         return converterParaDTO(salvo);
@@ -72,7 +76,7 @@ public class ClienteService {
                 if (!isCpfValido(cpfLimpo)) {
                     throw new RuntimeException("CPF inválido!");
                 }
-                if (!cpfLimpo.equals(cliente.getCpf()) && repository.findByCpf(cpfLimpo).isPresent()) {
+                if (!cpfLimpo.equals(cliente.getCpf()) && repository.existsByCpf(cpfLimpo)) {
                     throw new RuntimeException("CPF já cadastrado!");
                 }
                 cliente.setCpf(cpfLimpo);
@@ -80,6 +84,30 @@ public class ClienteService {
 
             if (dto.getTelefone() != null) {
                 cliente.setTelefone(limpar(dto.getTelefone()));
+            }
+
+            if (dto.getCep() != null) {
+                cliente.setCep(limpar(dto.getCep()));
+            }
+
+            if (dto.getRua() != null) {
+                cliente.setRua(dto.getRua().trim());
+            }
+
+            if (dto.getNumero() != null) {
+                cliente.setNumero(dto.getNumero());
+            }
+
+            if (dto.getBairro() != null) {
+                cliente.setBairro(dto.getBairro().trim());
+            }
+
+            if (dto.getCidade() != null) {
+                cliente.setCidade(dto.getCidade().trim());
+            }
+
+            if (dto.getEstado() != null) {
+                cliente.setEstado(dto.getEstado().trim());
             }
 
             Cliente atualizado = repository.save(cliente);
@@ -102,8 +130,13 @@ public class ClienteService {
                 cliente.getId(),
                 cliente.getNome(),
                 formatarCpf(cliente.getCpf()),
-                formatarTelefone(cliente.getTelefone())
-        );
+                formatarTelefone(cliente.getTelefone()),
+                formatarCep(cliente.getCep()),
+                cliente.getRua(),
+                cliente.getNumero(),
+                cliente.getBairro(),
+                cliente.getCidade(),
+                cliente.getEstado());
     }
 
     private String limpar(String valor) {
@@ -111,30 +144,44 @@ public class ClienteService {
     }
 
     private String formatarCpf(String cpf) {
-        if (cpf == null || cpf.length() != 11) return cpf;
+        if (cpf == null || cpf.length() != 11)
+            return cpf;
         return cpf.substring(0, 3) + "." +
-               cpf.substring(3, 6) + "." +
-               cpf.substring(6, 9) + "-" +
-               cpf.substring(9);
+                cpf.substring(3, 6) + "." +
+                cpf.substring(6, 9) + "-" +
+                cpf.substring(9);
     }
 
     private String formatarTelefone(String tel) {
-        if (tel == null) return null;
+        if (tel == null)
+            return null;
         String only = limpar(tel);
         if (only.length() == 11) {
             return "(" + only.substring(0, 2) + ") " +
                     only.substring(2, 7) + "-" +
                     only.substring(7);
+        } else if (only.length() == 10) {
+            return "(" + only.substring(0, 2) + ") " +
+                    only.substring(2, 6) + "-" +
+                    only.substring(6);
         }
         return tel;
     }
 
-    /** Validação oficial de CPF */
+    private String formatarCep(String cep) {
+        if (cep == null || cep.length() != 8)
+            return cep;
+        return cep.substring(0, 5) + "-" + cep.substring(5);
+    }
+
     private boolean isCpfValido(String cpf) {
-        if (cpf == null) return false;
+        if (cpf == null)
+            return false;
         cpf = limpar(cpf);
-        if (cpf.length() != 11) return false;
-        if (cpf.matches("(\\d)\\1{10}")) return false;
+        if (cpf.length() != 11)
+            return false;
+        if (cpf.matches("(\\d)\\1{10}"))
+            return false;
 
         try {
             int soma = 0;
@@ -143,8 +190,10 @@ public class ClienteService {
                 soma += (cpf.charAt(i) - '0') * peso--;
             }
             int primeiroDigito = 11 - (soma % 11);
-            if (primeiroDigito > 9) primeiroDigito = 0;
-            if (primeiroDigito != (cpf.charAt(9) - '0')) return false;
+            if (primeiroDigito > 9)
+                primeiroDigito = 0;
+            if (primeiroDigito != (cpf.charAt(9) - '0'))
+                return false;
 
             soma = 0;
             peso = 11;
@@ -152,7 +201,8 @@ public class ClienteService {
                 soma += (cpf.charAt(i) - '0') * peso--;
             }
             int segundoDigito = 11 - (soma % 11);
-            if (segundoDigito > 9) segundoDigito = 0;
+            if (segundoDigito > 9)
+                segundoDigito = 0;
             return segundoDigito == (cpf.charAt(10) - '0');
         } catch (Exception e) {
             return false;
