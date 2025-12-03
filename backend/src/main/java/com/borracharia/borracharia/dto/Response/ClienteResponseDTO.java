@@ -6,10 +6,11 @@ public class ClienteResponseDTO {
     private String nome;
     private String cpf;
     private String telefone;
+    private String email;
     private String cep;
     private String rua;
     private String numero;
-    private String bairro;
+        private String bairro;
     private String cidade;
     private String estado;
 
@@ -18,6 +19,7 @@ public class ClienteResponseDTO {
             String nome,
             String cpf,
             String telefone,
+            String email,
             String cep,
             String rua,
             String numero,
@@ -28,6 +30,7 @@ public class ClienteResponseDTO {
         this.nome = nome;
         this.cpf = cpf;
         this.telefone = telefone;
+        this.email = email;
         this.cep = cep;
         this.rua = rua;
         this.numero = numero;
@@ -50,6 +53,9 @@ public class ClienteResponseDTO {
 
     public String getTelefone() {
         return telefone;
+    }
+        public String getEmail() {
+        return email;
     }
 
     public String getCep() {

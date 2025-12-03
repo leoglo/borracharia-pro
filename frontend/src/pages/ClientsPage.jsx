@@ -1,4 +1,3 @@
-// ClientsPage.jsx - CORRIGIDO PARA O BACKEND
 import { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, Users, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -45,7 +44,6 @@ export default function ClientsPage() {
     }
   };
 
-  // ⭐ CORRIGIDO: Busca pelos campos corretos do backend
   const filtered = clientes.filter(c =>
     c.nome?.toLowerCase().includes(search.toLowerCase()) ||
     c.cpf?.includes(search) ||

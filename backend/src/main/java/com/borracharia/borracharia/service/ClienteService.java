@@ -2,7 +2,11 @@ package com.borracharia.borracharia.service;
 
 import com.borracharia.borracharia.dto.Request.ClienteRequestDTO;
 import com.borracharia.borracharia.dto.Response.ClienteResponseDTO;
+import com.borracharia.borracharia.repository.VeiculoRepository;
+import com.borracharia.borracharia.dto.Request.VeiculoRequestDTO;
+import com.borracharia.borracharia.dto.Response.VeiculoResponseDTO;
 import com.borracharia.borracharia.model.Cliente;
+import com.borracharia.borracharia.model.Veiculo;
 import com.borracharia.borracharia.repository.ClienteRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -14,10 +18,12 @@ import java.util.Optional;
 public class ClienteService {
 
     private final ClienteRepository repository;
+    private final VeiculoRepository veiculoRepository;
 
-    public ClienteService(ClienteRepository repository) {
+    public ClienteService(ClienteRepository repository, VeiculoRepository veiculoRepository) {
         this.repository = repository;
-    }
+        this.veiculoRepository = veiculoRepository;
+    } // <--- CHAVE ADICIONADA AQUI!
 
     @Transactional
     public ClienteResponseDTO salvar(ClienteRequestDTO dto) {
@@ -42,12 +48,24 @@ public class ClienteService {
         cliente.setNome(dto.getNome().trim());
         cliente.setCpf(cpfLimpo);
         cliente.setTelefone(telefoneLimpo);
+        cliente.setEmail(dto.getEmail() != null ? dto.getEmail().trim() : null);
         cliente.setCep(cepLimpo);
         cliente.setRua(dto.getRua() != null ? dto.getRua().trim() : null);
         cliente.setNumero(dto.getNumero());
         cliente.setBairro(dto.getBairro() != null ? dto.getBairro().trim() : null);
         cliente.setCidade(dto.getCidade() != null ? dto.getCidade().trim() : null);
         cliente.setEstado(dto.getEstado() != null ? dto.getEstado().trim() : null);
+
+        if (dto.getVeiculo() != null) {
+            Veiculo veiculo = new Veiculo();
+            veiculo.setPlaca(dto.getVeiculo().getPlaca());
+            veiculo.setMarca(dto.getVeiculo().getMarca());
+            veiculo.setModelo(dto.getVeiculo().getModelo());
+            veiculo.setCor(dto.getVeiculo().getCor());
+            veiculo = veiculoRepository.save(veiculo);
+            // CORRIGIDO: adicionar o veículo à lista do cliente
+            cliente.getVeiculos().add(veiculo);
+        }
 
         Cliente salvo = repository.save(cliente);
         return converterParaDTO(salvo);
@@ -84,6 +102,10 @@ public class ClienteService {
 
             if (dto.getTelefone() != null) {
                 cliente.setTelefone(limpar(dto.getTelefone()));
+            }
+
+            if (dto.getEmail() != null) {
+                cliente.setEmail(dto.getEmail().trim());
             }
 
             if (dto.getCep() != null) {
@@ -131,6 +153,7 @@ public class ClienteService {
                 cliente.getNome(),
                 formatarCpf(cliente.getCpf()),
                 formatarTelefone(cliente.getTelefone()),
+                cliente.getEmail(),
                 formatarCep(cliente.getCep()),
                 cliente.getRua(),
                 cliente.getNumero(),

@@ -11,10 +11,22 @@ public class ClienteRequestDTO {
     private String telefone;
     private String cep;
     private String rua;
+    private String email;
+
     private String numero;
     private String bairro;
     private String cidade;
     private String estado;
+
+    private VeiculoRequestDTO veiculo;
+
+    public VeiculoRequestDTO getVeiculo() {
+        return veiculo;
+    }
+
+    public void setVeiculo(VeiculoRequestDTO veiculo) {
+        this.veiculo = veiculo;
+    }
 
     public String getNome() {
         return nome;
@@ -86,5 +98,13 @@ public class ClienteRequestDTO {
 
     public void setEstado(String estado) {
         this.estado = estado;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 }

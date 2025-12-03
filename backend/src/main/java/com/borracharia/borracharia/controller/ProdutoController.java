@@ -12,7 +12,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/produtos")
-@CrossOrigin("*")
+
 public class ProdutoController {
 
     private final ProdutoService service;

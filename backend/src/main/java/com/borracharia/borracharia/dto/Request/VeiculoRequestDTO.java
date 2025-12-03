@@ -1,32 +1,22 @@
 package com.borracharia.borracharia.dto.Request;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.Size;
-
 public class VeiculoRequestDTO {
 
-    // Para CREATE: obrigatório
-    // Para UPDATE: opcional (pode passar só o que quer mudar)
-    @Size(min = 7, max = 8, message = "Placa inválida")
     private String placa;
-
-    @Size(min = 2, max = 50, message = "Modelo deve ter entre 2 e 50 caracteres")
     private String modelo;
-
-    @Size(max = 30, message = "Marca deve ter no máximo 30 caracteres")
     private String marca;
-
-    @Min(value = 1900, message = "Ano mínimo é 1900")
-    @Max(value = 2026, message = "Ano máximo é 2026")
     private Integer ano;
-
-    @Min(value = 0, message = "KM não pode ser negativo")
     private Integer km;
-
     private Long clienteId;
+    private String cor;
 
-    // ========== GETTERS E SETTERS ==========
+    public String getCor() {
+        return cor;
+    }
+
+    public void setCor(String cor) {
+        this.cor = cor;
+    }
 
     public String getPlaca() {
         return placa;

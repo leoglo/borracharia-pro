@@ -1,45 +1,54 @@
 package com.borracharia.borracharia.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 
 @Entity
-@Table(name = "veiculos", uniqueConstraints = @UniqueConstraint(columnNames = "placa"))
+@Table(name = "veiculos")
 public class Veiculo {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank(message = "Placa Obrigatoria")
+    @Column(length = 8)
     private String placa;
 
-    @NotBlank(message = "Modelo Obrigatorio")
+    @Column(length = 50)
     private String modelo;
+
+    @Column(length = 30)
     private String marca;
 
-    @Min(value = 1900, message = "Ano inválido")
-    @Max(value = 2100, message = "Ano inválido")
+    @Min(value = 1900, message = "Ano mínimo é 1900")
+    @Max(value = 2100, message = "Ano máximo é 2100")
     private Integer ano;
 
-    public Integer getKm() {
+    @Column(length = 30)
+    private String cor;
+ 
+    private int km;
+
+    public int getKm() {
         return km;
     }
 
-    public void setKm(Integer km) {
+    public void setKm(int km) {
         this.km = km;
     }
 
-    private Integer km;
+    @Column(length = 500)
+    private String observacoes;
 
+    // ✅ MUDANÇA AQUI: JsonBackReference ao invés de JsonIgnoreProperties
     @ManyToOne
     @JoinColumn(name = "cliente_id")
-    @JsonIgnoreProperties("veiculos")
+    @JsonBackReference
     private Cliente cliente;
+
+    // Getters e Setters (mantenha todos)
 
     public Long getId() {
         return id;
@@ -81,11 +90,43 @@ public class Veiculo {
         this.ano = ano;
     }
 
+    public String getCor() {
+        return cor;
+    }
+
+    public void setCor(String cor) {
+        this.cor = cor;
+    }
+
+    public String getObservacoes() {
+        return observacoes;
+    }
+
+    public void setObservacoes(String observacoes) {
+        this.observacoes = observacoes;
+    }
+
     public Cliente getCliente() {
         return cliente;
     }
 
     public void setCliente(Cliente cliente) {
+        this.cliente = cliente;
+    }
+
+    // Construtores
+    public Veiculo() {
+    }
+
+    public Veiculo(String placa, String modelo, String marca, Integer ano, 
+                   String cor, String observacoes,Integer km, Cliente cliente) {
+        this.placa = placa;
+        this.modelo = modelo;
+        this.marca = marca;
+        this.ano = ano;
+        this.cor = cor;
+        this.observacoes = observacoes;
+        this.km = km;
         this.cliente = cliente;
     }
 }

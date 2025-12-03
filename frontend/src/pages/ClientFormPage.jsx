@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Save, Plus, Trash2, Car, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Car, AlertCircle, Check, RefreshCw } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
 
@@ -30,17 +30,83 @@ export default function ClientFormPage() {
     const carregarDados = async () => {
         try {
             setLoading(true);
-            const [resCliente, resVeiculos] = await Promise.all([
-                api.get(`/clientes/${id}`),
-                api.get(`/veiculos/cliente/${id}`)
-            ]);
-
+            
+            // Carrega cliente
+            const resCliente = await api.get(`/clientes/${id}`);
+            console.log('✅ Cliente carregado:', resCliente.data);
             setCliente(resCliente.data);
-            setVeiculos(resVeiculos.data.length > 0 ? resVeiculos.data : [{
-                placa: '', ano: '', marca: '', modelo: '', cor: '', observacoes: ''
-            }]);
+
+            // Verifica se o cliente já tem veículos no próprio objeto
+            if (resCliente.data.veiculos && resCliente.data.veiculos.length > 0) {
+                console.log('✅ Veículos encontrados no objeto cliente:', resCliente.data.veiculos);
+                setVeiculos(resCliente.data.veiculos);
+                setLoading(false);
+                return;
+            }
+
+            // Tenta carregar veículos por endpoint separado
+            console.log('🔍 Buscando veículos no endpoint: /veiculos/cliente/' + id);
+            try {
+                const resVeiculos = await api.get(`/veiculos/cliente/${id}`);
+                console.log('📦 Resposta completa de veículos:', resVeiculos);
+                console.log('📋 Data de veículos:', resVeiculos.data);
+                console.log('📊 Tipo de data:', typeof resVeiculos.data, Array.isArray(resVeiculos.data));
+                
+                if (resVeiculos.data) {
+                    // Verifica se é um array ou objeto com array dentro
+                    let veiculosArray = Array.isArray(resVeiculos.data) 
+                        ? resVeiculos.data 
+                        : resVeiculos.data.veiculos || resVeiculos.data.content || [];
+                    
+                    console.log('🚗 Array de veículos processado:', veiculosArray);
+                    
+                    if (veiculosArray.length > 0) {
+                        console.log('✅ ' + veiculosArray.length + ' veículo(s) carregado(s)');
+                        setVeiculos(veiculosArray);
+                    } else {
+                        console.log('⚠️ Array de veículos vazio');
+                        setVeiculos([{
+                            placa: '', ano: '', marca: '', modelo: '', cor: '', observacoes: ''
+                        }]);
+                    }
+                } else {
+                    console.log('⚠️ resVeiculos.data é null/undefined');
+                    setVeiculos([{
+                        placa: '', ano: '', marca: '', modelo: '', cor: '', observacoes: ''
+                    }]);
+                }
+            } catch (errVeiculos) {
+                console.error('❌ Erro ao carregar veículos:', errVeiculos);
+                console.log('📍 Tentando endpoint alternativo: /clientes/' + id + '/veiculos');
+                
+                // Tenta endpoint alternativo
+                try {
+                    const resVeiculosAlt = await api.get(`/clientes/${id}/veiculos`);
+                    console.log('📦 Resposta alternativa:', resVeiculosAlt.data);
+                    
+                    let veiculosArray = Array.isArray(resVeiculosAlt.data) 
+                        ? resVeiculosAlt.data 
+                        : resVeiculosAlt.data.veiculos || [];
+                    
+                    if (veiculosArray.length > 0) {
+                        console.log('✅ Veículos carregados do endpoint alternativo');
+                        setVeiculos(veiculosArray);
+                    } else {
+                        console.log('⚠️ Endpoint alternativo retornou vazio');
+                        setVeiculos([{
+                            placa: '', ano: '', marca: '', modelo: '', cor: '', observacoes: ''
+                        }]);
+                    }
+                } catch (errAlt) {
+                    console.error('❌ Endpoint alternativo também falhou:', errAlt);
+                    console.log('ℹ️ Criando veículo vazio');
+                    setVeiculos([{
+                        placa: '', ano: '', marca: '', modelo: '', cor: '', observacoes: ''
+                    }]);
+                }
+            }
         } catch (err) {
-            console.error('Erro ao carregar:', err);
+            console.error('❌ Erro ao carregar cliente:', err);
             alert('Cliente não encontrado');
             navigate('/clientes');
         } finally {
@@ -66,6 +132,42 @@ export default function ClientFormPage() {
         const novos = [...veiculos];
         novos[index][campo] = valor;
         setVeiculos(novos);
+    };
+
+    const salvarVeiculo = async (index) => {
+        const v = veiculos[index];
+        
+        if (!cliente.id && !id) {
+            alert('Salve o cliente primeiro antes de adicionar veículos');
+            return;
+        }
+
+        if (!v.placa && !v.modelo) {
+            alert('Preencha pelo menos a placa ou modelo do veículo');
+            return;
+        }
+
+        try {
+            const clienteId = id || cliente.id;
+            const veiculoData = {
+                ...v,
+                cliente: { id: clienteId }
+            };
+
+            if (v.id) {
+                await api.put(`/veiculos/${v.id}`, veiculoData);
+                alert('Veículo atualizado com sucesso!');
+            } else {
+                const res = await api.post('/veiculos', veiculoData);
+                const novosVeiculos = [...veiculos];
+                novosVeiculos[index] = { ...v, id: res.data.id };
+                setVeiculos(novosVeiculos);
+                alert('Veículo salvo com sucesso!');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Erro ao salvar veículo: ' + (err.response?.data?.message || err.message));
+        }
     };
 
     // Máscaras simples aplicadas no onChange
@@ -119,6 +221,11 @@ export default function ClientFormPage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        if (!validarFormulario()) {
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -129,21 +236,19 @@ export default function ClientFormPage() {
             } else {
                 const res = await api.post('/clientes', cliente);
                 clienteId = res.data.id;
+                setCliente({ ...cliente, id: clienteId });
             }
 
-            if (isEdit) {
-                await api.delete(`/veiculos/cliente/${id}`).catch(() => { });
-            }
-
-            for (const v of veiculos.filter(v => v.placa || v.modelo)) {
-                const veiculoData = {
-                    ...v,
-                    cliente: { id: clienteId } 
-                };
-                if (v.id) {
-                    await api.put(`/veiculos/${v.id}`, veiculoData);
-                } else {
-                    await api.post('/veiculos', veiculoData);
+            // Salva veículos que ainda não têm ID
+            for (let i = 0; i < veiculos.length; i++) {
+                const v = veiculos[i];
+                if ((v.placa || v.modelo) && !v.id) {
+                    const veiculoData = {
+                        ...v,
+                        cliente: { id: clienteId }
+                    };
+                    const res = await api.post('/veiculos', veiculoData);
+                    veiculos[i] = { ...v, id: res.data.id };
                 }
             }
 
@@ -307,32 +412,68 @@ export default function ClientFormPage() {
                         {/* COLUNA DIREITA: VEÍCULOS */}
                         <div className="bg-gray-900/80 backdrop-blur-lg rounded-2xl lg:rounded-3xl p-6 lg:p-8 border border-gray-700 shadow-2xl">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 lg:mb-8">
-                                <h2 className="text-xl lg:text-2xl font-bold text-cyan-400">VEÍCULOS</h2>
-                                <button
-                                    type="button"
-                                    onClick={adicionarVeiculo}
-                                    className="bg-cyan-600 hover:bg-cyan-500 text-black font-bold py-2 lg:py-3 px-4 lg:px-6 rounded-xl flex items-center gap-2 lg:gap-3 transition shadow-lg text-sm lg:text-base"
-                                >
-                                    <Plus className="w-5 h-5 lg:w-6 lg:h-6" />
-                                    Adicionar
-                                </button>
+                                <h2 className="text-xl lg:text-2xl font-bold text-cyan-400">
+                                    VEÍCULOS 
+                                    <span className="text-sm text-gray-400 ml-2">
+                                        ({veiculos.filter(v => v.id).length} salvos)
+                                    </span>
+                                </h2>
+                                <div className="flex gap-2">
+                                    {isEdit && (
+                                        <button
+                                            type="button"
+                                            onClick={carregarDados}
+                                            className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 lg:py-3 px-4 lg:px-6 rounded-xl flex items-center gap-2 transition shadow-lg text-sm lg:text-base"
+                                            title="Recarregar veículos"
+                                        >
+                                            <RefreshCw className="w-5 h-5 lg:w-6 lg:h-6" />
+                                            Recarregar
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={adicionarVeiculo}
+                                        className="bg-cyan-600 hover:bg-cyan-500 text-black font-bold py-2 lg:py-3 px-4 lg:px-6 rounded-xl flex items-center gap-2 lg:gap-3 transition shadow-lg text-sm lg:text-base"
+                                    >
+                                        <Plus className="w-5 h-5 lg:w-6 lg:h-6" />
+                                        Adicionar
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="space-y-4 lg:space-y-6 max-h-[500px] overflow-y-auto pr-2">
                                 {veiculos.map((v, i) => (
                                     <div key={i} className="bg-gray-800/60 rounded-xl lg:rounded-2xl p-4 lg:p-6 border border-gray-700">
                                         <div className="flex justify-between items-center mb-4">
-                                            <h3 className="text-lg lg:text-xl font-bold text-cyan-300">Veículo #{i + 1}</h3>
-                                            {veiculos.length > 1 && (
+                                            <h3 className="text-lg lg:text-xl font-bold text-cyan-300">
+                                                Veículo #{i + 1}
+                                                {v.id && (
+                                                    <span className="text-xs text-green-400 ml-2">
+                                                        ✓ Salvo (ID: {v.id})
+                                                    </span>
+                                                )}
+                                            </h3>
+                                            <div className="flex gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => removerVeiculo(i)}
-                                                    className="text-red-400 hover:text-red-300 p-2 hover:bg-red-900/30 rounded transition"
-                                                    title="Remover veículo"
+                                                    onClick={() => salvarVeiculo(i)}
+                                                    className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition text-sm"
+                                                    title="Salvar veículo"
                                                 >
-                                                    <Trash2 className="w-5 h-5 lg:w-6 lg:h-6" />
+                                                    <Check className="w-4 h-4" />
+                                                    {v.id ? 'Atualizar' : 'Salvar'}
                                                 </button>
-                                            )}
+                                                {veiculos.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removerVeiculo(i)}
+                                                        className="text-red-400 hover:text-red-300 p-2 hover:bg-red-900/30 rounded transition"
+                                                        title="Remover veículo"
+                                                    >
+                                                        <Trash2 className="w-5 h-5 lg:w-6 lg:h-6" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-3 lg:gap-6">

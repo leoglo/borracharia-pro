@@ -11,6 +11,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/clientes")
+
 public class ClienteController {
 
     private final ClienteService service;
@@ -28,6 +29,7 @@ public class ClienteController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+    
 
     @GetMapping
     public ResponseEntity<List<ClienteResponseDTO>> listarTodos() {
