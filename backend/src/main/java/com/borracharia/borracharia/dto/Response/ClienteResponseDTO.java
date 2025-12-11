@@ -1,5 +1,7 @@
 package com.borracharia.borracharia.dto.Response;
 
+import com.borracharia.borracharia.model.Cliente;
+
 public class ClienteResponseDTO {
 
     private Long id;
@@ -10,10 +12,11 @@ public class ClienteResponseDTO {
     private String cep;
     private String rua;
     private String numero;
-        private String bairro;
+    private String bairro;
     private String cidade;
     private String estado;
 
+    
     public ClienteResponseDTO(
             Long id,
             String nome,
@@ -39,6 +42,20 @@ public class ClienteResponseDTO {
         this.estado = estado;
     }
 
+    public ClienteResponseDTO(Cliente cliente) {
+        this.id = cliente.getId();
+        this.nome = cliente.getNome();
+        this.cpf = cliente.getCpf();
+        this.telefone = cliente.getTelefone();
+        this.email = cliente.getEmail();
+        this.cep = cliente.getCep();
+        this.rua = cliente.getRua();
+        this.numero = cliente.getNumero();
+        this.bairro = cliente.getBairro();
+        this.cidade = cliente.getCidade();
+        this.estado = cliente.getEstado();
+    }
+
     public Long getId() {
         return id;
     }
@@ -54,7 +71,8 @@ public class ClienteResponseDTO {
     public String getTelefone() {
         return telefone;
     }
-        public String getEmail() {
+
+    public String getEmail() {
         return email;
     }
 

@@ -7,7 +7,7 @@ export default function Sidebar() {
 
   const menu = [
     { icon: Home, label: "Dashboard", to: "/" },
-    { icon: ShoppingCart, label: "Vendas", to: "/sales" },
+    { icon: ShoppingCart, label: "Vendas", to: "/orcamento" },
     { icon: Package, label: "Produtos", to: "/produtos" },
     { icon: Users, label: "Clientes", to: "/clientes" },
     { icon: BarChart3, label: "Relatórios", to: "/reports" },

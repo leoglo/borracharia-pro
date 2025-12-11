@@ -8,6 +8,9 @@ import ProductFormPage from './pages/ProductFormPage.jsx';
 import ClientsPage from './pages/ClientsPage.jsx';
 import ClientFormPage from './pages/ClientFormPage.jsx';
 
+import OrcamentoFormPage from './pages/OrcamentoFormPage.jsx';
+
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -22,6 +25,7 @@ export default function App() {
             <Route path="/clientes" element={<ClientsPage />} />
             <Route path="/clientes/novo" element={<ClientFormPage />} />
             <Route path="/clientes/editar/:id" element={<ClientFormPage />} />
+            <Route path="/orcamento" element={<OrcamentoFormPage />} />
 
           </Routes>
         </main>

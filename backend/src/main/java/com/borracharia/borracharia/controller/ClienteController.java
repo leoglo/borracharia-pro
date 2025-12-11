@@ -2,22 +2,29 @@ package com.borracharia.borracharia.controller;
 
 import com.borracharia.borracharia.dto.Request.ClienteRequestDTO;
 import com.borracharia.borracharia.dto.Response.ClienteResponseDTO;
+import com.borracharia.borracharia.model.Cliente;
+import com.borracharia.borracharia.repository.ClienteRepository;
 import com.borracharia.borracharia.service.ClienteService;
 import jakarta.validation.Valid;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/clientes")
-
 public class ClienteController {
 
     private final ClienteService service;
+    private final ClienteRepository clienteRepository;
 
-    public ClienteController(ClienteService service) {
+    public ClienteController(ClienteService service, ClienteRepository clienteRepository) {
         this.service = service;
+        this.clienteRepository = clienteRepository;
     }
 
     @PostMapping
@@ -29,7 +36,6 @@ public class ClienteController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
-    
 
     @GetMapping
     public ResponseEntity<List<ClienteResponseDTO>> listarTodos() {
@@ -65,4 +71,19 @@ public class ClienteController {
         }
         return ResponseEntity.notFound().build();
     }
+
+    // NOVO ENDPOINT DE BUSCA
+@GetMapping("/buscar")
+public ResponseEntity<List<ClienteResponseDTO>> buscarClientes(@RequestParam String termo) {
+    Page<Cliente> clientes = clienteRepository
+        .findByNomeContainingIgnoreCaseOrCpfContainingOrTelefoneContaining(
+            termo, termo, termo, PageRequest.of(0, 10)
+        );
+    
+    List<ClienteResponseDTO> response = clientes.stream()
+        .map(ClienteResponseDTO::new)
+        .collect(Collectors.toList());
+        
+    return ResponseEntity.ok(response);
+}
 }
