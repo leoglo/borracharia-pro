@@ -23,15 +23,15 @@ public class ClienteService {
     public ClienteService(ClienteRepository repository, VeiculoRepository veiculoRepository) {
         this.repository = repository;
         this.veiculoRepository = veiculoRepository;
-    } // <--- CHAVE ADICIONADA AQUI!
+    }
 
     @Transactional
     public ClienteResponseDTO salvar(ClienteRequestDTO dto) {
-        String cpfLimpo = limpar(dto.getCpf());
-        String telefoneLimpo = limpar(dto.getTelefone());
-        String cepLimpo = limpar(dto.getCep());
+        String cpfLimpo = limpar(dto.cpf());
+        String telefoneLimpo = limpar(dto.telefone());
+        String cepLimpo = limpar(dto.cep());
 
-        if (dto.getNome() == null || dto.getNome().isBlank()) {
+        if (dto.nome() == null || dto.nome().isBlank()) {
             throw new RuntimeException("Nome é obrigatório!");
         }
 
@@ -45,25 +45,24 @@ public class ClienteService {
         }
 
         Cliente cliente = new Cliente();
-        cliente.setNome(dto.getNome().trim());
+        cliente.setNome(dto.nome().trim());
         cliente.setCpf(cpfLimpo);
         cliente.setTelefone(telefoneLimpo);
-        cliente.setEmail(dto.getEmail() != null ? dto.getEmail().trim() : null);
+        cliente.setEmail(dto.email() != null ? dto.email().trim() : null);
         cliente.setCep(cepLimpo);
-        cliente.setRua(dto.getRua() != null ? dto.getRua().trim() : null);
-        cliente.setNumero(dto.getNumero());
-        cliente.setBairro(dto.getBairro() != null ? dto.getBairro().trim() : null);
-        cliente.setCidade(dto.getCidade() != null ? dto.getCidade().trim() : null);
-        cliente.setEstado(dto.getEstado() != null ? dto.getEstado().trim() : null);
+        cliente.setRua(dto.rua() != null ? dto.rua().trim() : null);
+        cliente.setNumero(dto.numero());
+        cliente.setBairro(dto.bairro() != null ? dto.bairro().trim() : null);
+        cliente.setCidade(dto.cidade() != null ? dto.cidade().trim() : null);
+        cliente.setEstado(dto.estado() != null ? dto.estado().trim() : null);
 
-        if (dto.getVeiculo() != null) {
+        if (dto.veiculo() != null) {
             Veiculo veiculo = new Veiculo();
-            veiculo.setPlaca(dto.getVeiculo().getPlaca());
-            veiculo.setMarca(dto.getVeiculo().getMarca());
-            veiculo.setModelo(dto.getVeiculo().getModelo());
-            veiculo.setCor(dto.getVeiculo().getCor());
+            veiculo.setPlaca(dto.veiculo().placa());
+            veiculo.setMarca(dto.veiculo().marca());
+            veiculo.setModelo(dto.veiculo().modelo());
+            veiculo.setCor(dto.veiculo().cor());
             veiculo = veiculoRepository.save(veiculo);
-            // CORRIGIDO: adicionar o veículo à lista do cliente
             cliente.getVeiculos().add(veiculo);
         }
 
@@ -85,12 +84,12 @@ public class ClienteService {
     public Optional<ClienteResponseDTO> atualizar(Long id, ClienteRequestDTO dto) {
         return repository.findById(id).map(cliente -> {
 
-            if (dto.getNome() != null && !dto.getNome().isBlank()) {
-                cliente.setNome(dto.getNome().trim());
+            if (dto.nome() != null && !dto.nome().isBlank()) {
+                cliente.setNome(dto.nome().trim());
             }
 
-            if (dto.getCpf() != null) {
-                String cpfLimpo = limpar(dto.getCpf());
+            if (dto.cpf() != null) {
+                String cpfLimpo = limpar(dto.cpf());
                 if (!isCpfValido(cpfLimpo)) {
                     throw new RuntimeException("CPF inválido!");
                 }
@@ -100,36 +99,36 @@ public class ClienteService {
                 cliente.setCpf(cpfLimpo);
             }
 
-            if (dto.getTelefone() != null) {
-                cliente.setTelefone(limpar(dto.getTelefone()));
+            if (dto.telefone() != null) {
+                cliente.setTelefone(limpar(dto.telefone()));
             }
 
-            if (dto.getEmail() != null) {
-                cliente.setEmail(dto.getEmail().trim());
+            if (dto.email() != null) {
+                cliente.setEmail(dto.email().trim());
             }
 
-            if (dto.getCep() != null) {
-                cliente.setCep(limpar(dto.getCep()));
+            if (dto.cep() != null) {
+                cliente.setCep(limpar(dto.cep()));
             }
 
-            if (dto.getRua() != null) {
-                cliente.setRua(dto.getRua().trim());
+            if (dto.rua() != null) {
+                cliente.setRua(dto.rua().trim());
             }
 
-            if (dto.getNumero() != null) {
-                cliente.setNumero(dto.getNumero());
+            if (dto.numero() != null) {
+                cliente.setNumero(dto.numero());
             }
 
-            if (dto.getBairro() != null) {
-                cliente.setBairro(dto.getBairro().trim());
+            if (dto.bairro() != null) {
+                cliente.setBairro(dto.bairro().trim());
             }
 
-            if (dto.getCidade() != null) {
-                cliente.setCidade(dto.getCidade().trim());
+            if (dto.cidade() != null) {
+                cliente.setCidade(dto.cidade().trim());
             }
 
-            if (dto.getEstado() != null) {
-                cliente.setEstado(dto.getEstado().trim());
+            if (dto.estado() != null) {
+                cliente.setEstado(dto.estado().trim());
             }
 
             Cliente atualizado = repository.save(cliente);

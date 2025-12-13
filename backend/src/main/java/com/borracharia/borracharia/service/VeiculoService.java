@@ -27,10 +27,10 @@ public class VeiculoService {
     @Transactional
     public VeiculoResponseDTO salvar(VeiculoRequestDTO dto) {
         // normaliza valores
-        String placaLimpa = limparPlaca(dto.getPlaca());
+        String placaLimpa = limparPlaca(dto.placa());
 
         // valida campos obrigatórios
-        if (dto.getModelo() == null || dto.getModelo().isBlank()) {
+        if (dto.modelo() == null || dto.modelo().isBlank()) {
             throw new RuntimeException("Modelo é obrigatório!");
         }
 
@@ -43,26 +43,26 @@ public class VeiculoService {
         }
 
         // valida ano (se informado)
-        if (dto.getAno() != null) {
-            validarAno(dto.getAno());
+        if (dto.ano() != null) {
+            validarAno(dto.ano());
         }
 
         // valida km (se informado)
-        if (dto.getKm() != null && dto.getKm() < 0) {
+        if (dto.km() != null && dto.km() < 0) {
             throw new RuntimeException("KM não pode ser negativo!");
         }
 
         Veiculo veiculo = new Veiculo();
         veiculo.setPlaca(placaLimpa);
-        veiculo.setModelo(dto.getModelo().trim());
-        veiculo.setMarca(dto.getMarca() != null ? dto.getMarca().trim() : null);
-        veiculo.setAno(dto.getAno());
-        veiculo.setKm(dto.getKm());
-        veiculo.setCor(dto.getCor() != null ? dto.getCor().trim() : null);
+        veiculo.setModelo(dto.modelo().trim());
+        veiculo.setMarca(dto.marca() != null ? dto.marca().trim() : null);
+        veiculo.setAno(dto.ano());
+        veiculo.setKm(dto.km());
+        veiculo.setCor(dto.cor() != null ? dto.cor().trim() : null);
 
         // associa cliente (se informado)
-        if (dto.getClienteId() != null) {
-            Cliente cliente = clienteRepository.findById(dto.getClienteId())
+        if (dto.clienteId() != null) {
+            Cliente cliente = clienteRepository.findById(dto.clienteId())
                     .orElseThrow(() -> new RuntimeException("Cliente não encontrado!"));
             veiculo.setCliente(cliente);
         }
@@ -95,8 +95,8 @@ public class VeiculoService {
     public Optional<VeiculoResponseDTO> atualizar(Long id, VeiculoRequestDTO dto) {
         return repository.findById(id).map(veiculo -> {
 
-            if (dto.getPlaca() != null && !dto.getPlaca().isBlank()) {
-                String placaLimpa = limparPlaca(dto.getPlaca());
+            if (dto.placa() != null && !dto.placa().isBlank()) {
+                String placaLimpa = limparPlaca(dto.placa());
                 validarPlaca(placaLimpa);
 
                 if (!placaLimpa.equals(veiculo.getPlaca()) && repository.findByPlaca(placaLimpa).isPresent()) {
@@ -105,32 +105,32 @@ public class VeiculoService {
                 veiculo.setPlaca(placaLimpa);
             }
 
-            if (dto.getModelo() != null && !dto.getModelo().isBlank()) {
-                veiculo.setModelo(dto.getModelo().trim());
+            if (dto.modelo() != null && !dto.modelo().isBlank()) {
+                veiculo.setModelo(dto.modelo().trim());
             }
 
-            if (dto.getMarca() != null) {
-                veiculo.setMarca(dto.getMarca().trim());
+            if (dto.marca() != null) {
+                veiculo.setMarca(dto.marca().trim());
             }
 
-            if (dto.getAno() != null) {
-                validarAno(dto.getAno());
-                veiculo.setAno(dto.getAno());
+            if (dto.ano() != null) {
+                validarAno(dto.ano());
+                veiculo.setAno(dto.ano());
             }
 
-            if (dto.getKm() != null) {
-                if (dto.getKm() < 0) {
+            if (dto.km() != null) {
+                if (dto.km() < 0) {
                     throw new RuntimeException("KM não pode ser negativo!");
                 }
-                veiculo.setKm(dto.getKm());
+                veiculo.setKm(dto.km());
             }
 
-            if (dto.getCor() != null) {
-                veiculo.setCor(dto.getCor().trim());
+            if (dto.cor() != null) {
+                veiculo.setCor(dto.cor().trim());
             }
 
-            if (dto.getClienteId() != null) {
-                Cliente cliente = clienteRepository.findById(dto.getClienteId())
+            if (dto.clienteId() != null) {
+                Cliente cliente = clienteRepository.findById(dto.clienteId())
                         .orElseThrow(() -> new RuntimeException("Cliente não encontrado!"));
                 veiculo.setCliente(cliente);
             }

@@ -27,7 +27,7 @@ public class ProdutoService {
     public ProdutoResponseDTO criar(ProdutoRequestDTO dto) {
         validarParaCriacao(dto);
 
-        String codigo = normalizarString(dto.getCodigoProduto());
+        String codigo = normalizarString(dto.codigoProduto());
         repository.findByCodigoProduto(codigo).ifPresent(p -> {
             throw new IllegalArgumentException("Código de produto já cadastrado (ID: " + p.getId() + ")");
         });
@@ -61,7 +61,7 @@ public class ProdutoService {
 
         validarParaAtualizacao(dto);
 
-        String codigoNovo = normalizarString(dto.getCodigoProduto());
+        String codigoNovo = normalizarString(dto.codigoProduto());
         String codigoAtual = normalizarString(produto.getCodigoProduto());
 
         if (codigoNovo != null && !codigoNovo.equals(codigoAtual)) {
@@ -70,7 +70,6 @@ public class ProdutoService {
             });
         }
 
-        // ← USE O UPDATE PARCIAL!
         mapper.updateParcial(dto, produto);
         normalizarProduto(produto);
 
@@ -87,47 +86,46 @@ public class ProdutoService {
 
     // ==================== VALIDAÇÕES SEPARADAS ====================
 
-    private void validarParaCriacao(ProdutoRequestDTO dto) { // ← CORRIGIDO: ProdutoRequestDTO
+    private void validarParaCriacao(ProdutoRequestDTO dto) {
         validarObrigatorios(dto);
         validarRegrasDeNegocio(dto);
     }
 
     private void validarParaAtualizacao(ProdutoRequestDTO dto) {
-        validarRegrasDeNegocio(dto); // só valida o que vier
+        validarRegrasDeNegocio(dto);
     }
 
     private void validarObrigatorios(ProdutoRequestDTO dto) {
-        String codigo = normalizarString(dto.getCodigoProduto());
+        String codigo = normalizarString(dto.codigoProduto());
         if (codigo == null || codigo.isEmpty()) {
             throw new IllegalArgumentException("Código do produto é obrigatório");
         }
-        String descricao = normalizarString(dto.getDescricao());
+        String descricao = normalizarString(dto.descricao());
         if (descricao == null || descricao.isEmpty()) {
             throw new IllegalArgumentException("Descrição do produto é obrigatória");
-
         }
     }
 
     private void validarRegrasDeNegocio(ProdutoRequestDTO dto) {
-        validarValorMonetario(dto.getPrecoProduto(), "Preço do produto");
-        validarValorMonetario(dto.getFrete(), "Frete");
-        validarValorMonetario(dto.getCustoMedio(), "Custo médio");
-        validarValorMonetario(dto.getMargemLucro(), "Margem de lucro");
-        validarValorMonetario(dto.getPrecoVenda(), "Preço de venda");
-        validarValorMonetario(dto.getPeso(), "Peso");
+        validarValorMonetario(dto.precoProduto(), "Preço do produto");
+        validarValorMonetario(dto.frete(), "Frete");
+        validarValorMonetario(dto.custoMedio(), "Custo médio");
+        validarValorMonetario(dto.margemLucro(), "Margem de lucro");
+        validarValorMonetario(dto.precoVenda(), "Preço de venda");
+        validarValorMonetario(dto.peso(), "Peso");
 
-        validarPercentual(dto.getIpiPercentual(), "IPI");
-        validarPercentual(dto.getIcmsPercentual(), "ICMS");
-        validarPercentual(dto.getDiferencaIcmsPercentual(), "Diferença de ICMS");
-        validarPercentual(dto.getReducaoIcmsPercentual(), "Redução de ICMS");
-        validarPercentual(dto.getIcmsSubstituicaoPercentual(), "ICMS Substituição");
-        validarPercentual(dto.getIpiPercentualFinal(), "IPI Final");
-        validarPercentual(dto.getOutrosPercentual(), "Outros percentuais");
+        validarPercentual(dto.ipiPercentual(), "IPI");
+        validarPercentual(dto.icmsPercentual(), "ICMS");
+        validarPercentual(dto.diferencaIcmsPercentual(), "Diferença de ICMS");
+        validarPercentual(dto.reducaoIcmsPercentual(), "Redução de ICMS");
+        validarPercentual(dto.icmsSubstituicaoPercentual(), "ICMS Substituição");
+        validarPercentual(dto.ipiPercentualFinal(), "IPI Final");
+        validarPercentual(dto.outrosPercentual(), "Outros percentuais");
 
-        validarQuantidade(dto.getQuantidadeEstoque(), "Quantidade em estoque");
-        validarQuantidade(dto.getQuantidadePedido(), "Quantidade em pedido");
-        validarQuantidade(dto.getQuantidadeAguardando(), "Quantidade aguardando");
-        validarQuantidade(dto.getQuantidadeMinima(), "Quantidade mínima");
+        validarQuantidade(dto.quantidadeEstoque(), "Quantidade em estoque");
+        validarQuantidade(dto.quantidadePedido(), "Quantidade em pedido");
+        validarQuantidade(dto.quantidadeAguardando(), "Quantidade aguardando");
+        validarQuantidade(dto.quantidadeMinima(), "Quantidade mínima");
     }
 
     private void validarValorMonetario(BigDecimal valor, String nome) {
