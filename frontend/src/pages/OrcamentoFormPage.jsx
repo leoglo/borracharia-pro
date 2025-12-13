@@ -9,7 +9,7 @@ export default function OrcamentoFormPage() {
   const isEdit = !!id;
 
   const [cliente, setCliente] = useState(null);
-  const [veiculos, setVeiculos] = useState(null);
+  const [veiculoSelecionado, setVeiculoSelecionado] = useState(null);
   const [clientesFiltrados, setClientesFiltrados] = useState([]);
   const [buscaCliente, setBuscaCliente] = useState('');
   const [mostrarDropdown, setMostrarDropdown] = useState(false);
@@ -21,6 +21,9 @@ export default function OrcamentoFormPage() {
   const [loading, setLoading] = useState(false);
   const [showModalCliente, setShowModalCliente] = useState(false);
   const [showModalVeiculos, setShowModalVeiculos] = useState(false);
+  const [orcamentoNum, setOrcamentoNum] = useState(isEdit ? 'Carregando...' : 'Novo');
+  const [dataOrcamento, setDataOrcamento] = useState(new Date().toISOString().split('T')[0]);
+
 
   // Form novo cliente
   const [novoCliente, setNovoCliente] = useState({
@@ -36,6 +39,39 @@ export default function OrcamentoFormPage() {
   const subtotal = itens.reduce((acc, i) => acc + i.total, 0);
   const totalGeral = subtotal - desconto;
 
+  // Carregar dados do Orçamento para edição
+  useEffect(() => {
+    if (isEdit) {
+      const fetchOrcamento = async () => {
+        setLoading(true);
+        try {
+          const res = await api.get(`/orcamentos/${id}`);
+          const orcamento = res.data;
+
+          // Assumindo que o endpoint retorna: {cliente, veiculo, itens, desconto, total, dataAbertura, numeroOrcamento}
+          setCliente(orcamento.cliente);
+          setBuscaCliente(orcamento.cliente.nome);
+          setItens(orcamento.itens);
+          setDesconto(orcamento.desconto || 0);
+          setVeiculoSelecionado(orcamento.veiculo);
+          setOrcamentoNum(orcamento.numeroOrcamento || `ORC-${id}`);
+          setDataOrcamento(orcamento.dataAbertura.split('T')[0]);
+
+          // Carregar veículos do cliente
+          const resV = await api.get(`/veiculos/cliente/${orcamento.cliente.id}`);
+          setVeiculosDoCliente(resV.data);
+
+        } catch (err) {
+          console.error('Erro ao carregar orçamento:', err);
+          alert('Erro ao carregar os dados do orçamento para edição.');
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchOrcamento();
+    }
+  }, [id, isEdit]);
+
   // Busca clientes no backend conforme digita (com debounce)
   useEffect(() => {
     const buscarClientesNoBackend = async () => {
@@ -45,7 +81,6 @@ export default function OrcamentoFormPage() {
       }
 
       try {
-        // Endpoint deve buscar no banco com LIKE e retornar apenas resultados relevantes
         const res = await api.get(`/clientes/buscar?termo=${encodeURIComponent(buscaCliente)}`);
         setClientesFiltrados(res.data);
       } catch (err) {
@@ -54,7 +89,6 @@ export default function OrcamentoFormPage() {
       }
     };
 
-    // Debounce: espera 300ms após parar de digitar
     const timeoutId = setTimeout(buscarClientesNoBackend, 300);
     return () => clearTimeout(timeoutId);
   }, [buscaCliente]);
@@ -68,12 +102,13 @@ export default function OrcamentoFormPage() {
     setCliente(clienteSelecionado);
     setBuscaCliente(clienteSelecionado.nome);
     setMostrarDropdown(false);
-    
+
     try {
-      const resV = await api.get(`/clientes/${clienteSelecionado.id}/veiculos`);
+      const resV = await api.get(`/veiculos/cliente/${clienteSelecionado.id}`);
       setVeiculosDoCliente(resV.data);
-      setVeiculos(null);
+      setVeiculoSelecionado(null); // Limpa o veículo ao trocar de cliente
     } catch (err) {
+      console.error('Erro ao carregar veículos:', err);
       alert('Erro ao carregar veículos do cliente');
     }
   };
@@ -106,6 +141,10 @@ export default function OrcamentoFormPage() {
       const res = await api.post('/clientes', novoCliente);
       setCliente(res.data);
       setBuscaCliente(res.data.nome);
+      // Limpa veículos e busca
+      setVeiculosDoCliente([]);
+      setVeiculoSelecionado(null);
+      
       setShowModalCliente(false);
       setNovoCliente({
         nome: '', cpf: '', telefone: '', email: '',
@@ -122,13 +161,16 @@ export default function OrcamentoFormPage() {
   const handleCadastrarVeiculo = async (e) => {
     e.preventDefault();
     if (!cliente) return alert('Selecione um cliente primeiro');
-    
+
     setLoading(true);
     try {
-      const payload = { ...novoVeiculo, cliente: { id: cliente.id } };
+      const payload = {
+        ...novoVeiculo,
+        clienteId: cliente.id
+      };
       const res = await api.post('/veiculos', payload);
       setVeiculosDoCliente([...veiculosDoCliente, res.data]);
-      setVeiculos(res.data);
+      setVeiculoSelecionado(res.data);
       setShowModalVeiculos(false);
       setNovoVeiculo({ placa: '', marca: '', modelo: '', ano: '', cor: '' });
       alert('Veículo cadastrado com sucesso!');
@@ -142,17 +184,17 @@ export default function OrcamentoFormPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!cliente) return alert('Selecione um cliente');
-    if (!veiculos) return alert('Selecione um veículo');
+    if (!veiculoSelecionado) return alert('Selecione um veículo');
 
     setLoading(true);
     try {
       const payload = {
-        cliente: { id: cliente.id },
-        veiculo: { id: veiculos.id },
-        itens,
-        desconto,
+        clienteId: cliente.id,
+        veiculoId: veiculoSelecionado.id,
+        itens: itens.map(item => ({...item, total: Number(item.total)})), // Garante que totais são números
+        desconto: Number(desconto), // Garante que desconto é número
         total: totalGeral,
-        dataAbertura: new Date().toISOString().split('T')[0]
+        dataAbertura: dataOrcamento
       };
 
       if (isEdit) {
@@ -164,6 +206,7 @@ export default function OrcamentoFormPage() {
       alert('Orçamento salvo com sucesso!');
       navigate('/orcamentos');
     } catch (err) {
+      console.error("Erro no submit:", err);
       alert('Erro ao salvar orçamento');
     } finally {
       setLoading(false);
@@ -193,14 +236,23 @@ export default function OrcamentoFormPage() {
           <div className="flex flex-wrap gap-4">
             <div className="bg-gray-800/80 rounded-xl px-4 py-3 border border-gray-700">
               <label className="text-xs text-gray-400 block mb-1">Nº ORÇAMENTO</label>
-              <input type="text" value="ORC-2025-001" readOnly className="bg-transparent text-cyan-300 font-bold text-sm outline-none w-32" />
+              <input type="text" value={orcamentoNum} readOnly className="bg-transparent text-cyan-300 font-bold text-sm outline-none w-32" />
             </div>
             <div className="bg-gray-800/80 rounded-xl px-4 py-3 border border-gray-700">
               <label className="text-xs text-gray-400 block mb-1">DATA</label>
-              <input type="date" defaultValue={new Date().toISOString().split('T')[0]} className="bg-transparent text-white font-bold text-sm outline-none" />
+              <input 
+                type="date" 
+                value={dataOrcamento} 
+                onChange={(e) => setDataOrcamento(e.target.value)}
+                className="bg-transparent text-white font-bold text-sm outline-none" 
+              />
             </div>
           </div>
         </div>
+        {/* Adiciona um indicador de carregamento quando estiver buscando dados em edição */}
+        {loading && isEdit && (
+            <div className="text-center py-4 text-cyan-400 font-semibold">Carregando dados do orçamento...</div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -226,11 +278,12 @@ export default function OrcamentoFormPage() {
                   value={buscaCliente}
                   onChange={(e) => handleBuscaCliente(e.target.value)}
                   onFocus={() => setMostrarDropdown(true)}
+                  onBlur={() => setTimeout(() => setMostrarDropdown(false), 200)} // Adiciona delay para clique no dropdown
                   placeholder="Digite o nome, CPF ou telefone..."
                   className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-cyan-500 outline-none"
                   required
                 />
-                
+
                 {/* Dropdown de resultados */}
                 {mostrarDropdown && clientesFiltrados.length > 0 && (
                   <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl max-h-60 overflow-y-auto">
@@ -247,9 +300,9 @@ export default function OrcamentoFormPage() {
                     ))}
                   </div>
                 )}
-                
+
                 {/* Mensagem quando não encontra */}
-                {mostrarDropdown && buscaCliente && clientesFiltrados.length === 0 && (
+                {mostrarDropdown && buscaCliente.trim().length >= 2 && clientesFiltrados.length === 0 && (
                   <div className="absolute z-10 w-full mt-1 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-4">
                     <p className="text-gray-400 text-sm">Nenhum cliente encontrado</p>
                   </div>
@@ -289,7 +342,6 @@ export default function OrcamentoFormPage() {
                     <input
                       type="text"
                       value={cliente?.rua || ''}
-                      placeholder="Rua"
                       readOnly
                       className="w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-3 text-gray-400"
                     />
@@ -300,7 +352,6 @@ export default function OrcamentoFormPage() {
                     <input
                       type="text"
                       value={cliente?.numero || ''}
-                      placeholder="número"
                       readOnly
                       className="w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-3 text-gray-400"
                     />
@@ -311,7 +362,6 @@ export default function OrcamentoFormPage() {
                     <input
                       type="text"
                       value={cliente?.bairro || ''}
-                      placeholder="Bairro"
                       readOnly
                       className="w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-3 text-gray-400"
                     />
@@ -322,7 +372,6 @@ export default function OrcamentoFormPage() {
                     <input
                       type="text"
                       value={cliente?.cidade || ''}
-                      placeholder="Cidade"
                       readOnly
                       className="w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-3 text-gray-400"
                     />
@@ -333,7 +382,6 @@ export default function OrcamentoFormPage() {
                     <input
                       type="text"
                       value={cliente?.estado || ''}
-                      placeholder="UF"
                       readOnly
                       className="w-full bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-3 text-gray-400"
                     />
@@ -357,8 +405,8 @@ export default function OrcamentoFormPage() {
                 </div>
                 <select
                   className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
-                  onChange={e => setVeiculos(veiculosDoCliente.find(v => v.id === Number(e.target.value)))}
-                  value={veiculos?.id || ''}
+                  onChange={e => setVeiculoSelecionado(veiculosDoCliente.find(v => v.id === Number(e.target.value)))}
+                  value={veiculoSelecionado?.id || ''}
                   required
                 >
                   <option value="">Selecione o veículo...</option>
@@ -398,36 +446,36 @@ export default function OrcamentoFormPage() {
                     {itens.map((item, i) => (
                       <tr key={i} className="border-b border-gray-700">
                         <td className="py-3 px-2">
-                          <input 
-                            className="bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-2 w-full text-white text-sm" 
-                            value={item.codigo} 
-                            onChange={e => atualizarItem(i, 'codigo', e.target.value)} 
+                          <input
+                            className="bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-2 w-full text-white text-sm"
+                            value={item.codigo}
+                            onChange={e => atualizarItem(i, 'codigo', e.target.value)}
                           />
                         </td>
                         <td className="py-3 px-2">
-                          <input 
-                            className="bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-2 w-full text-white text-sm" 
-                            value={item.descricao} 
-                            onChange={e => atualizarItem(i, 'descricao', e.target.value)} 
-                            placeholder="ex: Pneu, serviço..." 
+                          <input
+                            className="bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-2 w-full text-white text-sm"
+                            value={item.descricao}
+                            onChange={e => atualizarItem(i, 'descricao', e.target.value)}
+                            placeholder="ex: Pneu, serviço..."
                           />
                         </td>
                         <td className="py-3 px-2">
-                          <input 
-                            type="number" 
-                            min="1" 
-                            className="bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-2 w-16 text-center text-white text-sm" 
-                            value={item.quantidade} 
-                            onChange={e => atualizarItem(i, 'quantidade', Number(e.target.value))} 
+                          <input
+                            type="number"
+                            min="1"
+                            className="bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-2 w-16 text-center text-white text-sm"
+                            value={item.quantidade}
+                            onChange={e => atualizarItem(i, 'quantidade', Number(e.target.value))}
                           />
                         </td>
                         <td className="py-3 px-2">
-                          <input 
-                            type="number" 
-                            step="0.01" 
-                            className="bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-2 w-24 text-white text-sm" 
-                            value={item.valorUnitario} 
-                            onChange={e => atualizarItem(i, 'valorUnitario', Number(e.target.value))} 
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-2 w-24 text-white text-sm"
+                            value={item.valorUnitario}
+                            onChange={e => atualizarItem(i, 'valorUnitario', Number(e.target.value))}
                           />
                         </td>
                         <td className="py-3 px-2 text-right font-bold text-cyan-300 text-sm">
@@ -483,7 +531,7 @@ export default function OrcamentoFormPage() {
             <button
               type="submit"
               disabled={loading}
-              className="px-8 py-3 bg-cyan-500 hover:bg-cyan-400 text-black text-base md:text-lg font-bold rounded-xl transition shadow-2xl flex items-center justify-center gap-3"
+              className="px-8 py-3 bg-cyan-500 hover:bg-cyan-400 text-black text-base md:text-lg font-bold rounded-xl transition shadow-2xl flex items-center justify-center gap-3 disabled:opacity-50"
             >
               {loading ? 'SALVANDO...' : 'SALVAR ORÇAMENTO'}
               <Save className="w-5 h-5" />
@@ -603,13 +651,21 @@ export default function OrcamentoFormPage() {
                     />
                   </div>
                 </div>
-
-                <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                  <button type="button" onClick={() => setShowModalCliente(false)} className="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl">
+                <div className="flex justify-end gap-4 pt-4">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowModalCliente(false)}
+                    className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition"
+                  >
                     Cancelar
                   </button>
-                  <button type="submit" disabled={loading} className="flex-1 px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-black font-bold rounded-xl">
+                  <button 
+                    type="submit" 
+                    disabled={loading}
+                    className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition flex items-center gap-2 disabled:opacity-50"
+                  >
                     {loading ? 'Salvando...' : 'Cadastrar Cliente'}
+                    <UserPlus className="w-4 h-4" />
                   </button>
                 </div>
               </form>
@@ -618,17 +674,17 @@ export default function OrcamentoFormPage() {
         )}
 
         {/* MODAL CADASTRAR VEÍCULO */}
-        {showModalVeiculos && (
+        {showModalVeiculos && cliente && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-2xl">
-              <div className="border-b border-gray-700 p-4 md:p-6 flex items-center justify-between">
-                <h2 className="text-xl md:text-2xl font-bold text-cyan-400">NOVO VEÍCULO</h2>
+            <div className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-xl max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-gray-900 border-b border-gray-700 p-4 md:p-6 flex items-center justify-between">
+                <h2 className="text-xl md:text-2xl font-bold text-cyan-400">NOVO VEÍCULO PARA {cliente.nome}</h2>
                 <button onClick={() => setShowModalVeiculos(false)} className="text-gray-400 hover:text-white">
                   <X className="w-6 h-6" />
                 </button>
               </div>
               <form onSubmit={handleCadastrarVeiculo} className="p-4 md:p-6 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm text-gray-300 mb-2">Placa *</label>
                     <input
@@ -636,7 +692,7 @@ export default function OrcamentoFormPage() {
                       required
                       value={novoVeiculo.placa}
                       onChange={e => setNovoVeiculo({...novoVeiculo, placa: e.target.value})}
-                      className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
+                      className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white uppercase"
                     />
                   </div>
                   <div>
@@ -660,33 +716,39 @@ export default function OrcamentoFormPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-300 mb-2">Ano *</label>
+                    <label className="block text-sm text-gray-300 mb-2">Ano</label>
                     <input
-                      type="text"
-                      required
+                      type="number"
                       value={novoVeiculo.ano}
                       onChange={e => setNovoVeiculo({...novoVeiculo, ano: e.target.value})}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm text-gray-300 mb-2">Cor *</label>
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm text-gray-300 mb-2">Cor</label>
                     <input
                       type="text"
-                      required
                       value={novoVeiculo.cor}
                       onChange={e => setNovoVeiculo({...novoVeiculo, cor: e.target.value})}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
                 </div>
-
-                <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                  <button type="button" onClick={() => setShowModalVeiculos(false)} className="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl">
+                <div className="flex justify-end gap-4 pt-4">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowModalVeiculos(false)}
+                    className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition"
+                  >
                     Cancelar
                   </button>
-                  <button type="submit" disabled={loading} className="flex-1 px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-black font-bold rounded-xl">
+                  <button 
+                    type="submit" 
+                    disabled={loading}
+                    className="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-black font-bold rounded-xl transition flex items-center gap-2 disabled:opacity-50"
+                  >
                     {loading ? 'Salvando...' : 'Cadastrar Veículo'}
+                    <Car className="w-4 h-4" />
                   </button>
                 </div>
               </form>
