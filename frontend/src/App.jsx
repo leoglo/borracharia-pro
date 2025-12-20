@@ -25,7 +25,9 @@ export default function App() {
             <Route path="/clientes" element={<ClientsPage />} />
             <Route path="/clientes/novo" element={<ClientFormPage />} />
             <Route path="/clientes/editar/:id" element={<ClientFormPage />} />
-            <Route path="/orcamento" element={<OrcamentoFormPage />} />
+            <Route path="/orcamentos" element={<OrcamentoFormPage />} />
+            <Route path="/orcamentos/novo" element={<OrcamentoFormPage />} />
+            <Route path="/orcamentos/editar/:id" element={<OrcamentoFormPage />} />
 
           </Routes>
         </main>

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Save, Plus, Trash2, Car, UserPlus, X } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Car, UserPlus, X, Search } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
+
 
 export default function OrcamentoFormPage() {
   const { id } = useParams();
@@ -17,6 +18,10 @@ export default function OrcamentoFormPage() {
   const [itens, setItens] = useState([
     { codigo: '', descricao: '', quantidade: 1, valorUnitario: 0, total: 0 }
   ]);
+  const [produtos, setProdutos] = useState([]);
+  const [buscaProduto, setBuscaProduto] = useState('');
+  const [produtosFiltrados, setProdutosFiltrados] = useState([]);
+  const [indiceProdutoAtivo, setIndiceProdutoAtivo] = useState(null);
   const [desconto, setDesconto] = useState(0);
   const [loading, setLoading] = useState(false);
   const [showModalCliente, setShowModalCliente] = useState(false);
@@ -24,6 +29,11 @@ export default function OrcamentoFormPage() {
   const [orcamentoNum, setOrcamentoNum] = useState(isEdit ? 'Carregando...' : 'Novo');
   const [dataOrcamento, setDataOrcamento] = useState(new Date().toISOString().split('T')[0]);
 
+  // --- NOVOS ESTADOS PARA A BUSCA ---
+  const [showModalBuscaOrcamento, setShowModalBuscaOrcamento] = useState(false);
+  const [termoBuscaOrcamento, setTermoBuscaOrcamento] = useState('');
+  const [orcamentosEncontrados, setOrcamentosEncontrados] = useState([]);
+  // ----------------------------------
 
   // Form novo cliente
   const [novoCliente, setNovoCliente] = useState({
@@ -37,7 +47,56 @@ export default function OrcamentoFormPage() {
   });
 
   const subtotal = itens.reduce((acc, i) => acc + i.total, 0);
-  const totalGeral = subtotal - desconto;
+  const descontoEmReais = (subtotal * desconto) / 100;
+  const totalGeral = subtotal - descontoEmReais;
+
+  // Buscar produtos do banco de dados
+  useEffect(() => {
+    const carregarProdutos = async () => {
+      try {
+        const res = await api.get('/produtos');
+        setProdutos(res.data);
+      } catch (err) {
+        console.error('Erro ao carregar produtos:', err);
+      }
+    };
+    carregarProdutos();
+  }, []);
+
+  // Filtrar produtos conforme busca
+  const buscarProdutos = (termo, index) => {
+    setBuscaProduto(termo);
+    setIndiceProdutoAtivo(index);
+
+    if (termo.trim().length < 2) {
+      setProdutosFiltrados([]);
+      return;
+    }
+
+    const filtrados = produtos.filter(p =>
+      p.codigoProduto?.toLowerCase().includes(termo.toLowerCase()) ||
+      p.codigo?.toLowerCase().includes(termo.toLowerCase()) ||
+      p.descricao?.toLowerCase().includes(termo.toLowerCase())
+    );
+    setProdutosFiltrados(filtrados);
+  };
+
+  const selecionarProduto = (produto, index) => {
+    const novos = [...itens];
+    novos[index].codigo = produto.codigoProduto || produto.codigo || '';
+    novos[index].descricao = produto.descricao || produto.nome || '';
+    // Busca o preço de venda do produto
+    novos[index].valorUnitario = Number(produto.precoVenda || produto.preco) || 0;
+
+    const qtd = Number(novos[index].quantidade) || 0;
+    const unit = Number(novos[index].valorUnitario) || 0;
+    novos[index].total = qtd * unit;
+
+    setItens(novos);
+    setProdutosFiltrados([]);
+    setBuscaProduto('');
+    setIndiceProdutoAtivo(null);
+  };
 
   // Carregar dados do Orçamento para edição
   useEffect(() => {
@@ -48,7 +107,6 @@ export default function OrcamentoFormPage() {
           const res = await api.get(`/orcamentos/${id}`);
           const orcamento = res.data;
 
-          // Assumindo que o endpoint retorna: {cliente, veiculo, itens, desconto, total, dataAbertura, numeroOrcamento}
           setCliente(orcamento.cliente);
           setBuscaCliente(orcamento.cliente.nome);
           setItens(orcamento.itens);
@@ -57,7 +115,6 @@ export default function OrcamentoFormPage() {
           setOrcamentoNum(orcamento.numeroOrcamento || `ORC-${id}`);
           setDataOrcamento(orcamento.dataAbertura.split('T')[0]);
 
-          // Carregar veículos do cliente
           const resV = await api.get(`/veiculos/cliente/${orcamento.cliente.id}`);
           setVeiculosDoCliente(resV.data);
 
@@ -106,7 +163,7 @@ export default function OrcamentoFormPage() {
     try {
       const resV = await api.get(`/veiculos/cliente/${clienteSelecionado.id}`);
       setVeiculosDoCliente(resV.data);
-      setVeiculoSelecionado(null); // Limpa o veículo ao trocar de cliente
+      setVeiculoSelecionado(null);
     } catch (err) {
       console.error('Erro ao carregar veículos:', err);
       alert('Erro ao carregar veículos do cliente');
@@ -141,10 +198,9 @@ export default function OrcamentoFormPage() {
       const res = await api.post('/clientes', novoCliente);
       setCliente(res.data);
       setBuscaCliente(res.data.nome);
-      // Limpa veículos e busca
       setVeiculosDoCliente([]);
       setVeiculoSelecionado(null);
-      
+
       setShowModalCliente(false);
       setNovoCliente({
         nome: '', cpf: '', telefone: '', email: '',
@@ -181,6 +237,25 @@ export default function OrcamentoFormPage() {
     }
   };
 
+  const buscarOrcamentosExistentes = async () => {
+    if (termoBuscaOrcamento.trim().length < 2) {
+      alert('Digite pelo menos 2 caracteres para buscar');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.get(`/orcamentos/buscar?termo=${encodeURIComponent(termoBuscaOrcamento)}`);
+      setOrcamentosEncontrados(res.data);
+    } catch (err) {
+      console.error('Erro ao buscar orçamentos:', err);
+      alert('Erro ao buscar orçamentos');
+      setOrcamentosEncontrados([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!cliente) return alert('Selecione um cliente');
@@ -191,8 +266,8 @@ export default function OrcamentoFormPage() {
       const payload = {
         clienteId: cliente.id,
         veiculoId: veiculoSelecionado.id,
-        itens: itens.map(item => ({...item, total: Number(item.total)})), // Garante que totais são números
-        desconto: Number(desconto), // Garante que desconto é número
+        itens: itens.map(item => ({ ...item, total: Number(item.total) })),
+        desconto: Number(desconto),
         total: totalGeral,
         dataAbertura: dataOrcamento
       };
@@ -234,24 +309,40 @@ export default function OrcamentoFormPage() {
 
           {/* INFORMAÇÕES NO HEADER */}
           <div className="flex flex-wrap gap-4">
-            <div className="bg-gray-800/80 rounded-xl px-4 py-3 border border-gray-700">
-              <label className="text-xs text-gray-400 block mb-1">Nº ORÇAMENTO</label>
-              <input type="text" value={orcamentoNum} readOnly className="bg-transparent text-cyan-300 font-bold text-sm outline-none w-32" />
+            <div className="flex items-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowModalBuscaOrcamento(true)}
+                className="p-3 bg-cyan-600 hover:bg-cyan-500 text-black rounded-xl transition shadow-lg flex items-center justify-center mb-0.5"
+                title="Pesquisar Orçamento"
+              >
+                <Search className="w-5 h-5" />
+              </button>
+
+              <div className="bg-gray-800/80 rounded-xl px-4 py-3 border border-gray-700">
+                <label className="text-xs text-gray-400 block mb-1 uppercase font-bold">Nº Orçamento</label>
+                <input
+                  type="text"
+                  value={orcamentoNum}
+                  readOnly
+                  className="bg-transparent text-cyan-300 font-bold text-sm outline-none w-32"
+                />
+              </div>
             </div>
             <div className="bg-gray-800/80 rounded-xl px-4 py-3 border border-gray-700">
               <label className="text-xs text-gray-400 block mb-1">DATA</label>
-              <input 
-                type="date" 
-                value={dataOrcamento} 
+              <input
+                type="date"
+                value={dataOrcamento}
                 onChange={(e) => setDataOrcamento(e.target.value)}
-                className="bg-transparent text-white font-bold text-sm outline-none" 
+                className="bg-transparent text-white font-bold text-sm outline-none"
               />
             </div>
           </div>
         </div>
-        {/* Adiciona um indicador de carregamento quando estiver buscando dados em edição */}
+
         {loading && isEdit && (
-            <div className="text-center py-4 text-cyan-400 font-semibold">Carregando dados do orçamento...</div>
+          <div className="text-center py-4 text-cyan-400 font-semibold">Carregando dados do orçamento...</div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -278,7 +369,7 @@ export default function OrcamentoFormPage() {
                   value={buscaCliente}
                   onChange={(e) => handleBuscaCliente(e.target.value)}
                   onFocus={() => setMostrarDropdown(true)}
-                  onBlur={() => setTimeout(() => setMostrarDropdown(false), 200)} // Adiciona delay para clique no dropdown
+                  onBlur={() => setTimeout(() => setMostrarDropdown(false), 200)}
                   placeholder="Digite o nome, CPF ou telefone..."
                   className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-cyan-500 outline-none"
                   required
@@ -450,15 +541,48 @@ export default function OrcamentoFormPage() {
                             className="bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-2 w-full text-white text-sm"
                             value={item.codigo}
                             onChange={e => atualizarItem(i, 'codigo', e.target.value)}
+                            placeholder="Código"
                           />
                         </td>
-                        <td className="py-3 px-2">
+                        <td className="py-3 px-2 relative">
                           <input
                             className="bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-2 w-full text-white text-sm"
-                            value={item.descricao}
-                            onChange={e => atualizarItem(i, 'descricao', e.target.value)}
-                            placeholder="ex: Pneu, serviço..."
+                            value={indiceProdutoAtivo === i ? buscaProduto : item.descricao}
+                            onChange={e => {
+                              buscarProdutos(e.target.value, i);
+                              atualizarItem(i, 'descricao', e.target.value);
+                            }}
+                            onFocus={() => {
+                              setIndiceProdutoAtivo(i);
+                              setBuscaProduto(item.descricao);
+                            }}
+                            onBlur={() => {
+                              setTimeout(() => {
+                                setIndiceProdutoAtivo(null);
+                                setProdutosFiltrados([]);
+                              }, 200);
+                            }}
+                            placeholder="Digite para buscar produto..."
                           />
+
+                          {/* Dropdown de produtos */}
+                          {indiceProdutoAtivo === i && produtosFiltrados.length > 0 && (
+                            <div className="absolute z-20 w-full mt-1 bg-gray-800 border border-cyan-500 rounded-lg shadow-2xl max-h-60 overflow-y-auto">
+                              {produtosFiltrados.map((p) => (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => selecionarProduto(p, i)}
+                                  className="w-full text-left px-3 py-2 hover:bg-gray-700 transition border-b border-gray-700 last:border-b-0"
+                                >
+                                  <p className="font-bold text-white text-sm">{p.descricao || p.nome}</p>
+                                  <p className="text-xs text-gray-400">
+                                    Código: {p.codigoProduto || p.codigo} • R$ {Number(p.precoVenda || 0).toFixed(2).replace('.', ',')}
+                                  </p>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-2">
                           <input
@@ -509,7 +633,7 @@ export default function OrcamentoFormPage() {
                           className="bg-gray-800/70 border border-gray-700 rounded-lg px-2 py-2 w-24 text-right text-white text-sm"
                         />
                       </td>
-                      <td className="text-right text-red-400 py-3 px-2">- R$ {desconto.toFixed(2).replace('.', ',')}</td>
+                      <td className="text-right text-red-400 py-3 px-2">-  {desconto.toFixed(2).replace('.', ',')} % </td>
                       <td></td>
                     </tr>
                     <tr className="text-lg md:text-xl font-extrabold text-cyan-400">
@@ -558,7 +682,7 @@ export default function OrcamentoFormPage() {
                       type="text"
                       required
                       value={novoCliente.nome}
-                      onChange={e => setNovoCliente({...novoCliente, nome: e.target.value})}
+                      onChange={e => setNovoCliente({ ...novoCliente, nome: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
@@ -568,7 +692,7 @@ export default function OrcamentoFormPage() {
                       type="text"
                       required
                       value={novoCliente.cpf}
-                      onChange={e => setNovoCliente({...novoCliente, cpf: e.target.value})}
+                      onChange={e => setNovoCliente({ ...novoCliente, cpf: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
@@ -578,7 +702,7 @@ export default function OrcamentoFormPage() {
                       type="text"
                       required
                       value={novoCliente.telefone}
-                      onChange={e => setNovoCliente({...novoCliente, telefone: e.target.value})}
+                      onChange={e => setNovoCliente({ ...novoCliente, telefone: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
@@ -587,7 +711,7 @@ export default function OrcamentoFormPage() {
                     <input
                       type="email"
                       value={novoCliente.email}
-                      onChange={e => setNovoCliente({...novoCliente, email: e.target.value})}
+                      onChange={e => setNovoCliente({ ...novoCliente, email: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
@@ -600,7 +724,7 @@ export default function OrcamentoFormPage() {
                     <input
                       type="text"
                       value={novoCliente.rua}
-                      onChange={e => setNovoCliente({...novoCliente, rua: e.target.value})}
+                      onChange={e => setNovoCliente({ ...novoCliente, rua: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
@@ -609,7 +733,7 @@ export default function OrcamentoFormPage() {
                     <input
                       type="text"
                       value={novoCliente.numero}
-                      onChange={e => setNovoCliente({...novoCliente, numero: e.target.value})}
+                      onChange={e => setNovoCliente({ ...novoCliente, numero: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
@@ -618,7 +742,7 @@ export default function OrcamentoFormPage() {
                     <input
                       type="text"
                       value={novoCliente.bairro}
-                      onChange={e => setNovoCliente({...novoCliente, bairro: e.target.value})}
+                      onChange={e => setNovoCliente({ ...novoCliente, bairro: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
@@ -627,7 +751,7 @@ export default function OrcamentoFormPage() {
                     <input
                       type="text"
                       value={novoCliente.cidade}
-                      onChange={e => setNovoCliente({...novoCliente, cidade: e.target.value})}
+                      onChange={e => setNovoCliente({ ...novoCliente, cidade: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
@@ -637,7 +761,7 @@ export default function OrcamentoFormPage() {
                       type="text"
                       maxLength={2}
                       value={novoCliente.estado}
-                      onChange={e => setNovoCliente({...novoCliente, estado: e.target.value})}
+                      onChange={e => setNovoCliente({ ...novoCliente, estado: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
@@ -646,21 +770,21 @@ export default function OrcamentoFormPage() {
                     <input
                       type="text"
                       value={novoCliente.cep}
-                      onChange={e => setNovoCliente({...novoCliente, cep: e.target.value})}
+                      onChange={e => setNovoCliente({ ...novoCliente, cep: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
                 </div>
                 <div className="flex justify-end gap-4 pt-4">
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => setShowModalCliente(false)}
                     className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition"
                   >
                     Cancelar
                   </button>
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     disabled={loading}
                     className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition flex items-center gap-2 disabled:opacity-50"
                   >
@@ -672,7 +796,7 @@ export default function OrcamentoFormPage() {
             </div>
           </div>
         )}
-
+       
         {/* MODAL CADASTRAR VEÍCULO */}
         {showModalVeiculos && cliente && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -691,7 +815,7 @@ export default function OrcamentoFormPage() {
                       type="text"
                       required
                       value={novoVeiculo.placa}
-                      onChange={e => setNovoVeiculo({...novoVeiculo, placa: e.target.value})}
+                      onChange={e => setNovoVeiculo({ ...novoVeiculo, placa: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white uppercase"
                     />
                   </div>
@@ -701,7 +825,7 @@ export default function OrcamentoFormPage() {
                       type="text"
                       required
                       value={novoVeiculo.marca}
-                      onChange={e => setNovoVeiculo({...novoVeiculo, marca: e.target.value})}
+                      onChange={e => setNovoVeiculo({ ...novoVeiculo, marca: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
@@ -711,7 +835,7 @@ export default function OrcamentoFormPage() {
                       type="text"
                       required
                       value={novoVeiculo.modelo}
-                      onChange={e => setNovoVeiculo({...novoVeiculo, modelo: e.target.value})}
+                      onChange={e => setNovoVeiculo({ ...novoVeiculo, modelo: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
@@ -720,7 +844,7 @@ export default function OrcamentoFormPage() {
                     <input
                       type="number"
                       value={novoVeiculo.ano}
-                      onChange={e => setNovoVeiculo({...novoVeiculo, ano: e.target.value})}
+                      onChange={e => setNovoVeiculo({ ...novoVeiculo, ano: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
@@ -729,21 +853,21 @@ export default function OrcamentoFormPage() {
                     <input
                       type="text"
                       value={novoVeiculo.cor}
-                      onChange={e => setNovoVeiculo({...novoVeiculo, cor: e.target.value})}
+                      onChange={e => setNovoVeiculo({ ...novoVeiculo, cor: e.target.value })}
                       className="w-full bg-gray-800/70 border border-gray-700 rounded-xl px-4 py-3 text-white"
                     />
                   </div>
                 </div>
                 <div className="flex justify-end gap-4 pt-4">
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => setShowModalVeiculos(false)}
                     className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl transition"
                   >
                     Cancelar
                   </button>
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     disabled={loading}
                     className="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-black font-bold rounded-xl transition flex items-center gap-2 disabled:opacity-50"
                   >
@@ -756,7 +880,66 @@ export default function OrcamentoFormPage() {
           </div>
         )}
 
+         {showModalBuscaOrcamento && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+            <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl">
+              <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+                <h2 className="text-xl font-bold text-cyan-400">BUSCAR ORÇAMENTO NO BANCO</h2>
+                <button onClick={() => setShowModalBuscaOrcamento(false)} className="text-gray-400 hover:text-white">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="p-6">
+                <div className="flex gap-2 mb-6">
+                  <input
+                    type="text"
+                    placeholder="Digite nome do cliente ou CPF..."
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-cyan-500 outline-none"
+                    value={termoBuscaOrcamento}
+                    onChange={(e) => setTermoBuscaOrcamento(e.target.value)}
+                  />
+                  <button
+                    onClick={buscarOrcamentosExistentes}
+                    className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-6 rounded-xl transition"
+                  >
+                    BUSCAR
+                  </button>
+                </div>
+
+                <div className="max-h-80 overflow-y-auto space-y-2">
+                  {orcamentosEncontrados.length > 0 ? (
+                    orcamentosEncontrados.map((orc) => (
+                      <button
+                        key={orc.id}
+                        onClick={() => {
+                          navigate(`/orcamentos/editar/${orc.id}`); // Redireciona para a rota de edição
+                          setShowModalBuscaOrcamento(false);
+                        }}
+                        className="w-full bg-gray-800/50 hover:bg-gray-700 p-4 rounded-xl border border-gray-700 flex justify-between items-center transition group"
+                      >
+                        <div className="text-left">
+                          <p className="font-bold text-white group-hover:text-cyan-400">{orc.cliente?.nome || 'Cliente não identificado'}</p>
+                          <p className="text-xs text-gray-400">Data: {new Date(orc.dataAbertura).toLocaleDateString('pt-BR')}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-cyan-300 font-bold">R$ {Number(orc.total).toFixed(2).replace('.', ',')}</p>
+                          <p className="text-[10px] text-gray-500 uppercase">Ver detalhes</p>
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-center text-gray-500 py-10">Nenhum orçamento encontrado.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
+
     </div>
+
   );
 }

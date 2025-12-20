@@ -1,5 +1,6 @@
 package com.borracharia.borracharia.exception;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -14,106 +15,68 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /**
-     * Trata exceções de validação do Bean Validation (@NotBlank, @NotNull, etc)
-     */
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex) {
-        Map<String, String> errors = new HashMap<>();
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<Map<String, String>> handleBusinessException(BusinessException ex) {
+        Map<String, String> erro = new HashMap<>();
+        erro.put("message", ex.getMessage());
         
-        ex.getBindingResult().getAllErrors().forEach((error) -> {
-            String fieldName = ((FieldError) error).getField();
-            String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(erro);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolationException(
+            DataIntegrityViolationException ex) {
+
+        Map<String, Object> erro = new HashMap<>();
+        erro.put("timestamp", LocalDateTime.now());
+        erro.put("status", HttpStatus.BAD_REQUEST.value());
+        erro.put("error", "Dados inválidos");
+
+        String message = "Violação de integridade dos dados";
+        Throwable cause = ex.getMostSpecificCause();
+        if (cause != null) {
+            String sqlMessage = cause.getMessage().toLowerCase();
+            if (sqlMessage.contains("placa")) {
+                message = "Placa já cadastrada!";
+            } else if (sqlMessage.contains("unique") || sqlMessage.contains("duplicate")) {
+                message = "Valor já existente no sistema";
+            }
+        }
+
+        erro.put("message", message);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(erro);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidationException(
+            MethodArgumentNotValidException ex) {
+        
+        Map<String, String> erros = new HashMap<>();
+        ex.getBindingResult().getAllErrors().forEach(error -> {
+            String campo = ((FieldError) error).getField();
+            String mensagem = error.getDefaultMessage();
+            erros.put(campo, mensagem);
         });
 
-        ErrorResponse errorResponse = new ErrorResponse(
-            HttpStatus.BAD_REQUEST.value(),
-            "Erro de validação",
-            errors,
-            LocalDateTime.now()
-        );
+        Map<String, Object> resposta = new HashMap<>();
+        resposta.put("timestamp", LocalDateTime.now());
+        resposta.put("status", HttpStatus.BAD_REQUEST.value());
+        resposta.put("error", "Erro de validação");
+        resposta.put("errors", erros);
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(resposta);
     }
 
-    /**
-     * Trata IllegalArgumentException lançadas pelo Service
-     */
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException ex) {
-        ErrorResponse errorResponse = new ErrorResponse(
-            HttpStatus.BAD_REQUEST.value(),
-            ex.getMessage(),
-            null,
-            LocalDateTime.now()
-        );
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
-    }
-
-    /**
-     * Trata exceções genéricas não previstas
-     */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
-        ErrorResponse errorResponse = new ErrorResponse(
-            HttpStatus.INTERNAL_SERVER_ERROR.value(),
-            "Erro interno do servidor: " + ex.getMessage(),
-            null,
-            LocalDateTime.now()
-        );
+    public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
+        Map<String, Object> erro = new HashMap<>();
+        erro.put("timestamp", LocalDateTime.now());
+        erro.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+        erro.put("error", "Erro interno do servidor");
+        erro.put("message", "Ocorreu um erro inesperado. Contate o administrador.");
 
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-    }
-
-    /**
-     * Classe interna para padronizar resposta de erro
-     */
-    public static class ErrorResponse {
-        private int status;
-        private String message;
-        private Map<String, String> errors;
-        private LocalDateTime timestamp;
-
-        public ErrorResponse(int status, String message, Map<String, String> errors, LocalDateTime timestamp) {
-            this.status = status;
-            this.message = message;
-            this.errors = errors;
-            this.timestamp = timestamp;
-        }
-
-        // Getters e Setters
-        public int getStatus() {
-            return status;
-        }
-
-        public void setStatus(int status) {
-            this.status = status;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-
-        public void setMessage(String message) {
-            this.message = message;
-        }
-
-        public Map<String, String> getErrors() {
-            return errors;
-        }
-
-        public void setErrors(Map<String, String> errors) {
-            this.errors = errors;
-        }
-
-        public LocalDateTime getTimestamp() {
-            return timestamp;
-        }
-
-        public void setTimestamp(LocalDateTime timestamp) {
-            this.timestamp = timestamp;
-        }
+        ex.printStackTrace(); 
+        
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(erro);
     }
 }

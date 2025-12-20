@@ -120,14 +120,48 @@ export default function ClientFormPage() {
         }]);
     };
 
-    const removerVeiculo = (index) => {
+
+const removerVeiculo = async (index) => {
+    if (veiculos.length === 1) {
+        alert('É necessário ter pelo menos um veículo cadastrado');
+        return;
+    }
+
+    const veiculo = veiculos[index];
+
+    if (veiculo.id) {
+        const confirmar = window.confirm(
+            `Tem certeza que deseja excluir o veículo ${veiculo.placa || veiculo.modelo || 'sem placa'}?`
+        );
+
+        if (!confirmar) return;
+
+        try {
+            await api.delete(`/veiculos/${veiculo.id}`);
+            setVeiculos(veiculos.filter((_, i) => i !== index));
+            alert('Veículo excluído com sucesso!');
+        } catch (err) {
+            console.error('Erro ao deletar veículo:', err);
+            alert(
+                'Erro ao excluir veículo: ' +
+                (err.response?.data?.message || err.message || 'Tente novamente')
+            );
+            return; 
+        }
+    } else {
+        // Veículo novo (ainda não salvo) → só remove da tela
+        setVeiculos(veiculos.filter((_, i) => i !== index));
+    }
+};
+
+   /* const removerVeiculo = (index) => {
         if (veiculos.length === 1) {
             alert('É necessário ter pelo menos um veículo cadastrado');
             return;
         }
         setVeiculos(veiculos.filter((_, i) => i !== index));
     };
-
+*/
     const atualizarVeiculo = (index, campo, valor) => {
         const novos = [...veiculos];
         novos[index][campo] = valor;

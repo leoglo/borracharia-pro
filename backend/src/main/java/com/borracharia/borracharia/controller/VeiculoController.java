@@ -1,10 +1,12 @@
 package com.borracharia.borracharia.controller;
 
+import com.borracharia.borracharia.dto.Request.VeiculoRequestDTO;
+import com.borracharia.borracharia.dto.Response.VeiculoResponseDTO;
+import com.borracharia.borracharia.exception.BusinessException;
 import com.borracharia.borracharia.model.Cliente;
 import com.borracharia.borracharia.model.Veiculo;
-import com.borracharia.borracharia.repository.ClienteRepository;
-import com.borracharia.borracharia.repository.VeiculoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.borracharia.borracharia.service.VeiculoService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,66 +16,66 @@ import java.util.List;
 @RequestMapping("/veiculos")
 public class VeiculoController {
 
-    @Autowired
-    private VeiculoRepository veiculoRepository;
+    private final VeiculoService veiculoService;
 
-    @Autowired
-    private ClienteRepository clienteRepository;
+    public VeiculoController(VeiculoService veiculoService) {
+        this.veiculoService = veiculoService;
+    }
 
     @GetMapping
-    public List<Veiculo> listarTodos() {
-        return veiculoRepository.findAll();
+    public ResponseEntity<List<Veiculo>> listarTodos() {
+        return ResponseEntity.ok(veiculoService.listarTodosCompleto());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Veiculo> buscarPorId(@PathVariable Long id) {
-        return veiculoRepository.findById(id)
+        return veiculoService.buscarPorIdCompleto(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/cliente/{clienteId}")
-    public List<Veiculo> buscarPorCliente(@PathVariable Long clienteId) {
-        return veiculoRepository.findByClienteId(clienteId);
+    public ResponseEntity<List<Veiculo>> buscarPorCliente(@PathVariable Long clienteId) {
+        return ResponseEntity.ok(veiculoService.buscarPorClienteCompleto(clienteId));
     }
 
     @PostMapping
-    public ResponseEntity<Veiculo> criar(@RequestBody Veiculo veiculo) {
-        if (veiculo.getCliente() != null && veiculo.getCliente().getId() != null) {
-            Cliente cliente = clienteRepository.findById(veiculo.getCliente().getId())
-                    .orElseThrow(() -> new RuntimeException("Cliente não encontrado"));
-            veiculo.setCliente(cliente);
+    public ResponseEntity<?> criar(@RequestBody VeiculoRequestDTO dto) {
+        System.out.println("POST /veiculos - Recebido via DTO");
+        System.out.println("   Placa: " + dto.placa());
+        System.out.println("   Modelo: " + dto.modelo());
+
+        try {
+            VeiculoResponseDTO veiculoSalvo = veiculoService.salvar(dto); // ← MÉTODO SEGURO E VALIDADO
+            System.out.println("Veículo criado com sucesso");
+            return ResponseEntity.ok(veiculoSalvo);
+        } catch (BusinessException e) {
+            System.out.println("BusinessException capturada no Controller: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ErrorResponse(e.getMessage()));
+        } catch (Exception e) {
+            System.out.println("Exception inesperada: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Erro interno ao salvar veículo"));
         }
-        Veiculo veiculoSalvo = veiculoRepository.save(veiculo);
-        return ResponseEntity.ok(veiculoSalvo);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Veiculo> atualizar(@PathVariable Long id, @RequestBody Veiculo veiculoAtualizado) {
-        return veiculoRepository.findById(id)
-                .map(veiculo -> {
-                    veiculo.setPlaca(veiculoAtualizado.getPlaca());
-                    veiculo.setModelo(veiculoAtualizado.getModelo());
-                    veiculo.setMarca(veiculoAtualizado.getMarca());
-                    veiculo.setAno(veiculoAtualizado.getAno());
-                    veiculo.setCor(veiculoAtualizado.getCor());
-                    veiculo.setObservacoes(veiculoAtualizado.getObservacoes());
-                    
-                    if (veiculoAtualizado.getCliente() != null && veiculoAtualizado.getCliente().getId() != null) {
-                        Cliente cliente = clienteRepository.findById(veiculoAtualizado.getCliente().getId())
-                                .orElseThrow(() -> new RuntimeException("Cliente não encontrado"));
-                        veiculo.setCliente(cliente);
-                    }
-                    
-                    return ResponseEntity.ok(veiculoRepository.save(veiculo));
-                })
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> atualizar(@PathVariable Long id, @RequestBody Veiculo veiculo) {
+        try {
+            return veiculoService.atualizarCompleto(id, veiculo)
+                    .map(v -> ResponseEntity.ok((Object) v))
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (BusinessException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ErrorResponse(e.getMessage()));
+        }
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
-        if (veiculoRepository.existsById(id)) {
-            veiculoRepository.deleteById(id);
+        if (veiculoService.deletar(id)) {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.notFound().build();
@@ -81,7 +83,10 @@ public class VeiculoController {
 
     @DeleteMapping("/cliente/{clienteId}")
     public ResponseEntity<Void> deletarPorCliente(@PathVariable Long clienteId) {
-        veiculoRepository.deleteByClienteId(clienteId);
+        veiculoService.deletarPorCliente(clienteId);
         return ResponseEntity.noContent().build();
+    }
+
+    private record ErrorResponse(String message) {
     }
 }
